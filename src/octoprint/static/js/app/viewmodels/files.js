@@ -8,6 +8,7 @@ $(function () {
         self.slicing = parameters[3];
         self.printerProfiles = parameters[4];
         self.access = parameters[5];
+        self.piSupport = parameters[6];
 
         self.filesListVisible = ko.observable(true);
         self.showInternalFilename = ko.observable(true);
@@ -629,13 +630,41 @@ $(function () {
                 return;
             }
 
+            var proceed = function (p) {
+                if (
+                    p &&
+                    self.piSupport &&
+                    (self.piSupport.currentUndervoltage() ||
+                        self.piSupport.pastUndervoltage())
+                ) {
+                    showConfirmationDialog({
+                        message:
+                            gettext(
+                                "Your Pi is reporting undervoltage. It is not recommended to start a print job until an adequate power supply has been installed."
+                            ) +
+                            " <a href='https://faq.octoprint.org/pi-issues' target='_blank'>" +
+                            gettext("See also the FAQ") +
+                            "</a>.",
+                        question: gettext("Start the print job anyway?"),
+                        cancel: gettext("No"),
+                        proceed: gettext("Yes"),
+                        onproceed: function () {
+                            OctoPrint.files.select(data.origin, data.path, p);
+                        },
+                        nofade: true
+                    });
+                } else {
+                    OctoPrint.files.select(data.origin, data.path, p);
+                }
+            };
+
             if (
                 printAfterLoad &&
                 self.listHelper.isSelected(data) &&
                 self.enablePrint(data)
             ) {
                 // file was already selected, just start the print job
-                OctoPrint.job.start();
+                self.printerState.print();
             } else {
                 // select file, start print job (if requested and within dimensions)
                 var withinPrintDimensions = self.evaluatePrintDimensions(data, true);
@@ -650,12 +679,12 @@ $(function () {
                         cancel: gettext("No"),
                         proceed: gettext("Yes"),
                         onproceed: function () {
-                            OctoPrint.files.select(data.origin, data.path, print);
+                            proceed(print);
                         },
                         nofade: true
                     });
                 } else {
-                    OctoPrint.files.select(data.origin, data.path, print);
+                    proceed(print);
                 }
             }
         };
@@ -1730,8 +1759,10 @@ $(function () {
             "printerStateViewModel",
             "slicingViewModel",
             "printerProfilesViewModel",
-            "accessViewModel"
+            "accessViewModel",
+            "piSupportViewModel"
         ],
+        options: ["piSupportViewModel"],
         elements: [
             "#files_wrapper",
             "#add_folder_dialog",

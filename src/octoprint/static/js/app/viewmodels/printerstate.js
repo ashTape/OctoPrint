@@ -6,6 +6,9 @@ $(function () {
         self.settings = parameters[1];
         self.access = parameters[2];
 
+        // Optional
+        self.piSupport = parameters[3];
+
         self.stateString = ko.observable(undefined);
         self.errorString = ko.observable(undefined);
         self.hasErrorString = ko.pureComputed(function () {
@@ -433,8 +436,35 @@ $(function () {
                     }
                 });
             } else {
+                var proceed = function () {
+                    if (
+                        self.piSupport &&
+                        (self.piSupport.currentUndervoltage() ||
+                            self.piSupport.pastUndervoltage())
+                    ) {
+                        showConfirmationDialog({
+                            message:
+                                gettext(
+                                    "Your Pi is reporting undervoltage. It is not recommended to start a print job until an adequate power supply has been installed."
+                                ) +
+                                " <a href='https://faq.octoprint.org/pi-issues' target='_blank'>" +
+                                gettext("See also the FAQ") +
+                                "</a>.",
+                            question: gettext("Start the print job anyway?"),
+                            cancel: gettext("No"),
+                            proceed: gettext("Yes"),
+                            onproceed: function () {
+                                OctoPrint.job.start();
+                            },
+                            nofade: true
+                        });
+                    } else {
+                        OctoPrint.job.start();
+                    }
+                };
+
                 if (!self.settings.feature_printStartConfirmation()) {
-                    OctoPrint.job.start();
+                    proceed();
                 } else {
                     showConfirmationDialog({
                         message: gettext(
@@ -443,9 +473,7 @@ $(function () {
                         question: gettext("Do you want to start the print job now?"),
                         cancel: gettext("No"),
                         proceed: gettext("Yes"),
-                        onproceed: function () {
-                            OctoPrint.job.start();
-                        },
+                        onproceed: proceed,
                         nofade: true
                     });
                 }
@@ -483,7 +511,13 @@ $(function () {
 
     OCTOPRINT_VIEWMODELS.push({
         construct: PrinterStateViewModel,
-        dependencies: ["loginStateViewModel", "settingsViewModel", "accessViewModel"],
+        dependencies: [
+            "loginStateViewModel",
+            "settingsViewModel",
+            "accessViewModel",
+            "piSupportViewModel"
+        ],
+        optional: ["piSupportViewModel"],
         elements: ["#state_wrapper", "#drop_overlay"]
     });
 });
